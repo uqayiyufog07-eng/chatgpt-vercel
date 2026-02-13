@@ -57,11 +57,11 @@ export const defaultMessage: ChatMessage = {
 }
 
 const models = {
-  "gpt-4o": {
-    "128k": "gpt-4o-2024-08-06"
+  "minimax/minimax-m2.5": {
+    "128k": "minimax/minimax-m2.5"
   },
-  "gpt-4o-mini": {
-    "128k": "gpt-4o-mini"
+  "z-ai/glm-5": {
+    "128k": "z-ai/glm-5"
   }
 } satisfies {
   [k in SimpleModel]: {
@@ -70,13 +70,13 @@ const models = {
 }
 
 const modelFee = {
-  "gpt-4o-mini": {
-    input: 0.00015,
-    output: 0.0006
+  "minimax/minimax-m2.5": {
+    input: 0.0001,
+    output: 0.0003
   },
-  "gpt-4o-2024-08-06": {
-    input: 0.0025,
-    output: 0.01
+  "z-ai/glm-5": {
+    input: 0.0001,
+    output: 0.0003
   }
 } satisfies {
   [key in Model]: {
@@ -150,7 +150,6 @@ function Store() {
   }, 100)
 
   createEffect(() => {
-    store.validContext
     throttleCountContext(store.validContext.map(k => k.content).join("\n"))
   })
 
@@ -176,10 +175,12 @@ function Store() {
   const currentModel = createMemo(() => {
     const model = store.sessionSettings.model
     switch (model) {
-      case "gpt-4o":
-        return models["gpt-4o"]["128k"]
+      case "minimax/minimax-m2.5":
+        return models["minimax/minimax-m2.5"]["128k"]
+      case "z-ai/glm-5":
+        return models["z-ai/glm-5"]["128k"]
       default:
-        return models["gpt-4o-mini"]["128k"]
+        return models["minimax/minimax-m2.5"]["128k"]
     }
   })
 
@@ -207,23 +208,17 @@ export const FZFData = {
 
 export function loadSession(id: string) {
   const { store, setStore } = RootStore
-  // 只触发一次更新
   batch(() => {
     setStore("sessionId", id)
     try {
-      const globalSettings = localStorage.getItem(
-        LocalStorageKey.GLOBALSETTINGS
-      )
+      const globalSettings = localStorage.getItem(LocalStorageKey.GLOBALSETTINGS)
       const session = getSession(id)
       if (globalSettings) {
         const parsed = JSON.parse(globalSettings)
         setStore("globalSettings", t => {
-          const s = {
-            ...t,
-            ...parsed
-          }
-          if (s.model !== "gpt-4o" && s.model !== "gpt-4o-mini") {
-            s.model = "gpt-4o-mini"
+          const s = { ...t, ...parsed }
+          if (s.model !== "minimax/minimax-m2.5" && s.model !== "z-ai/glm-5") {
+            s.model = "minimax/minimax-m2.5"
           }
           return s
         })
@@ -232,12 +227,9 @@ export function loadSession(id: string) {
         const { settings, messages } = session
         if (settings) {
           setStore("sessionSettings", t => {
-            const s = {
-              ...t,
-              ...settings
-            }
-            if (s.model !== "gpt-4o" && s.model !== "gpt-4o-mini") {
-              s.model = "gpt-4o-mini"
+            const s = { ...t, ...settings }
+            if (s.model !== "minimax/minimax-m2.5" && s.model !== "z-ai/glm-5") {
+              s.model = "minimax/minimax-m2.5"
             }
             return s
           })
@@ -246,10 +238,7 @@ export function loadSession(id: string) {
           if (store.sessionSettings.saveSession) {
             setStore("messageList", messages)
           } else {
-            setStore(
-              "messageList",
-              messages.filter(m => m.type === "locked")
-            )
+            setStore("messageList", messages.filter(m => m.type === "locked"))
           }
         }
       }
@@ -257,6 +246,7 @@ export function loadSession(id: string) {
       console.log("Localstorage parse error")
     }
   })
+
   setTimeout(() => {
     const seesions = fetchAllSessions()
     FZFData.sessionOptions = seesions
@@ -265,24 +255,17 @@ export function loadSession(id: string) {
       .map(k => ({
         title: k.settings.title,
         desc: k.messages.map(k => k.content).join("\n"),
-        extra: {
-          id: k.id
-        }
+        extra: { id: k.id }
       }))
+
     if (id !== "index") {
       FZFData.sessionOptions.unshift({
         title: "回到主对话",
-        desc:
-          "其实点击顶部 Logo 也可以直接回到主对话。" +
-            seesions
-              .find(k => k.id === "index")
-              ?.messages.map(k => k.content)
-              .join("\n"),
-        extra: {
-          id: "index"
-        }
+        desc: "点击顶部 Logo 也可以直接回到主对话。",
+        extra: { id: "index" }
       })
     }
+
     FZFData.fzfSessions = new Fzf(FZFData.sessionOptions, {
       selector: k => `${k.title}\n${k.desc}`
     })
